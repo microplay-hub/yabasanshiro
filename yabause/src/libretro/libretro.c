@@ -545,15 +545,15 @@ void retro_set_resolution()
          current_height = game_height * 2;
          break;
       case RES_720P:
-         current_width = 1280;
+         current_width = 960;
          current_height = 720;
          break;
       case RES_1080P:
-         current_width = 1920;
+         current_width = 1440;
          current_height = 1080;
          break;
       case RES_NATIVE:
-         current_width = 3840;
+         current_width = 2880;
          current_height = 2160;
          break;
    }
@@ -1007,15 +1007,15 @@ bool retro_load_game(const struct retro_game_info *info)
          max_height = 512 * 2;
          break;
       case RES_720P:
-         max_width = 1280;
+         max_width = 960;
          max_height = 720;
          break;
       case RES_1080P:
-         max_width = 1920;
+         max_width = 1440;
          max_height = 1080;
          break;
       case RES_NATIVE:
-         max_width = 3840;
+         max_width = 2880;
          max_height = 2160;
          break;
    }
