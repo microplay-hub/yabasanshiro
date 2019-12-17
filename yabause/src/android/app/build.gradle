@@ -25,13 +25,21 @@ apply plugin: 'io.fabric'
 android {
     signingConfigs {
         pro {
-            storeFile file(System.getenv('KEY_FILE_NAME'))
+            if( System.getenv('KEY_FILE_NAME') == null ){
+                storeFile file("dmy")
+            }else {
+                storeFile file(System.getenv('KEY_FILE_NAME'))
+            }
             storePassword System.getenv('STORE_PASSWORD')
             keyAlias System.getenv('KEY_ALIAS')
             keyPassword System.getenv('KEY_PASSWORD')
         }
         release {
-            storeFile file(System.getenv('KEY_FILE_NAME'))
+            if( System.getenv('KEY_FILE_NAME') == null ){
+                storeFile file("dmy")
+            }else {
+                storeFile file(System.getenv('KEY_FILE_NAME'))
+            }
             storePassword System.getenv('STORE_PASSWORD')
             keyAlias System.getenv('KEY_ALIAS')
             keyPassword System.getenv('KEY_PASSWORD')
@@ -45,8 +53,8 @@ android {
         minSdkVersion 21
         targetSdkVersion 28
         multiDexEnabled true
-        versionCode 101
-        versionName '2.10.2'
+        versionCode 103
+        versionName '2.10.4'
         multiDexEnabled true
         vectorDrawables.useSupportLibrary = true
         signingConfig signingConfigs.pro
