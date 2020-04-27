@@ -96,8 +96,8 @@ extern struct retro_hw_render_callback hw_render;
 void retro_set_environment(retro_environment_t cb)
 {
    static const struct retro_variable vars[] = {
-      { "yabasanshiro_force_hle_bios", "Force HLE BIOS (restart, deprecated, debug only); disabled|enabled" },
-      { "yabasanshiro_frameskip", "Auto-frameskip (prevent fast-forwarding); enabled|disabled" },
+      { "yabasanshiro_force_hle_bios", "Force HLE BIOS (restart); disabled|enabled" },
+      { "yabasanshiro_frameskip", "Auto-frameskip; enabled|disabled" },
       { "yabasanshiro_addon_cart", "Addon Cartridge (restart); 4M_extended_ram|1M_extended_ram" },
       { "yabasanshiro_multitap_port1", "6Player Adaptor on Port 1; disabled|enabled" },
       { "yabasanshiro_multitap_port2", "6Player Adaptor on Port 2; disabled|enabled" },
@@ -1379,7 +1379,7 @@ void retro_run(void)
    if(!one_frame_rendered)
       video_cb(NULL, current_width, current_height, 0);
 
-   reset_global_gl_state();
+   //reset_global_gl_state();
 }
 
 #ifdef ANDROID
