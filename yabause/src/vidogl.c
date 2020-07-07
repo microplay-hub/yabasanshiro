@@ -210,7 +210,7 @@ static void Vdp2DrawRotation_in(RBGDrawInfo * rbg);
 static void Vdp2DrawRotationSync();
 static void Vdp2DrawRBG0(void);
 
-static u32 Vdp2ColorRamGetColor(u32 colorindex, int alpha);
+u32 Vdp2ColorRamGetColor(u32 colorindex, int alpha);
 static void Vdp2PatternAddrPos(vdp2draw_struct *info, int planex, int x, int planey, int y);
 static void Vdp2DrawPatternPos(vdp2draw_struct *info, YglTexture *texture, int x, int y, int cx, int cy, int lines);
 static INLINE void ReadVdp2ColorOffset(Vdp2 * regs, vdp2draw_struct *info, int mask);
@@ -1135,7 +1135,7 @@ static u16 Vdp2ColorRamGetColorRaw(u32 colorindex) {
   return 0;
 }
 
-static u32 Vdp2ColorRamGetColor(u32 colorindex, int alpha)
+u32 Vdp2ColorRamGetColor(u32 colorindex, int alpha)
 {
   switch (Vdp2Internal.ColorMode)
   {
@@ -2536,7 +2536,7 @@ static void FASTCALL Vdp2DrawBitmapCoordinateInc(vdp2draw_struct *info, YglTextu
 
 static void Vdp2DrawPatternPos(vdp2draw_struct *info, YglTexture *texture, int x, int y, int cx, int cy, int lines )
 {
-  u64 cacheaddr = ((u32)(info->alpha >> 3) << 27) |
+  u64 cacheaddr = (((u64)(info->priority&0xF))<<35) | ((u32)(info->alpha >> 3) << 27) |
     (info->paladdr << 20) | info->charaddr | info->transparencyenable |
     ((info->patternpixelwh >> 4) << 1) | (((u64)(info->coloroffset >> 8) & 0x07) << 32);
 
@@ -2597,10 +2597,12 @@ static void Vdp2DrawPatternPos(vdp2draw_struct *info, YglTexture *texture, int x
 
   if (1 == YglIsCached(_Ygl->texture_manager, cacheaddr, &c))
   {
+    //printf("x=%d,y=%d %lx cached\n",x,y,cacheaddr);
     YglCachedQuadOffset(&tile, &c, cx, cy, info->coordincx, info->coordincy);
     return;
   }
 
+  //printf("x=%d,y=%d %lx not cached\n",x,y,cacheaddr);
   YglQuadOffset(&tile, texture, &c, cx, cy, info->coordincx, info->coordincy);
   YglCacheAdd(_Ygl->texture_manager, cacheaddr, &c);
 
@@ -5921,6 +5923,7 @@ void VIDOGLVdp2DrawStart(void)
 
 void VIDOGLVdp2DrawEnd(void)
 {
+  if (fixVdp2Regs == NULL) return;
   Vdp2DrawRotationSync();
   FrameProfileAdd("Vdp2DrawRotationSync end");
 
@@ -6161,27 +6164,134 @@ void Vdp2GeneratePerLineColorCalcuration(vdp2draw_struct * info, int id) {
 
 }
 
+INLINE int Vdp2CheckCharAccessPenalty(int char_access, int ptn_access) {
+  if (_Ygl->rwidth >= 640) {
+    //if (char_access < ptn_access) {
+    //  return -1;
+    //}
+    if (ptn_access & 0x01) { // T0
+      // T0-T2
+      if ((char_access & 0x07) != 0) {
+        if (char_access < ptn_access) {
+          return -1;
+        }
+        return 0;
+      }
+    }
+
+    if (ptn_access & 0x02) { // T1
+      // T1-T3
+      if ((char_access & 0x0E) != 0) {
+        if (char_access < ptn_access) {
+          return -1;
+        }
+        return 0;
+      }
+    }
+
+    if (ptn_access & 0x04) { // T2
+      // T0,T2,T3
+      if ((char_access & 0x0D) != 0) {
+        if (char_access < ptn_access) {
+          return -1;
+        }
+        return 0;
+      }
+    }
+
+    if (ptn_access & 0x08) { // T3
+      // T0,T1,T3
+      if ((char_access & 0xB) != 0) {
+        if (char_access < ptn_access) {
+          return -1;
+        }
+        return 0;
+      }
+    }
+    return -1;
+  }
+  else {
+
+    if (ptn_access & 0x01) { // T0
+      // T0-T2, T4-T7
+      if ((char_access & 0xF7) != 0) {
+        return 0;
+      }
+    }
+
+    if (ptn_access & 0x02) { // T1
+      // T0-T3, T5-T7
+      if ((char_access & 0xEF) != 0) {
+        return 0;
+      }
+    }
+
+    if (ptn_access & 0x04) { // T2
+      // T0-T3, T6-T7
+      if ((char_access & 0xCF) != 0) {
+        return 0;
+      }
+    }
+
+    if (ptn_access & 0x08) { // T3
+      // T0-T3, T7
+      if ((char_access & 0x8F) != 0) {
+        return 0;
+      }
+    }
+
+    if (ptn_access & 0x10) { // T4
+      // T0-T3
+      if ((char_access & 0x0F) != 0) {
+        return 0;
+      }
+    }
+
+    if (ptn_access & 0x20) { // T5
+      // T1-T3
+      if ((char_access & 0x0E) != 0) {
+        return 0;
+      }
+    }
+
+    if (ptn_access & 0x40) { // T6
+      // T2,T3
+      if ((char_access & 0x0C) != 0) {
+        return 0;
+      }
+    }
+
+    if (ptn_access & 0x80) { // T7
+      // T3
+      if ((char_access & 0x08) != 0) {
+        return 0;
+      }
+    }
+    return -1;
+  }
+  return 0;
+}
+
 
 //////////////////////////////////////////////////////////////////////////////
 
 
 static void Vdp2DrawNBG0(void)
 {
-  vdp2draw_struct info = { 0 };
+  vdp2draw_struct info;
   YglTexture texture;
   YglCache tmpc;
+  int char_access = 0;
+  int ptn_access = 0;
   info.dst = 0;
   info.uclipmode = 0;
   info.id = 0;
   info.coordincx = 1.0f;
   info.coordincy = 1.0f;
-
   info.cor = 0;
   info.cog = 0;
   info.cob = 0;
-  int i;
   info.enable = 0;
-
   info.cellh = 256;
   info.specialcolorfunction = 0;
 
@@ -6189,10 +6299,14 @@ static void Vdp2DrawNBG0(void)
     info.char_bank[i] = 0;
     info.pname_bank[i] = 0;
     for (int j=0; j < 8; j++) {
-      if (AC_VRAM[i][j] == 0x04) 
+      if (AC_VRAM[i][j] == 0x04) {
         info.char_bank[i] = 1;
-      if (AC_VRAM[i][j] == 0x00)
+        char_access |= 1<<j;
+      }
+      if (AC_VRAM[i][j] == 0x00) {
         info.pname_bank[i] = 1;
+        ptn_access |= 1<<j;
+      }
     }
   }
 
@@ -6237,7 +6351,7 @@ static void Vdp2DrawNBG0(void)
     paraB.coefenab = fixVdp2Regs->KTCTL & 0x100;
     paraB.charaddr = (fixVdp2Regs->MPOFR & 0x70) * 0x2000;
     ReadPlaneSizeR(&paraB, fixVdp2Regs->PLSZ >> 12);
-    for (i = 0; i < 16; i++)
+    for (int i = 0; i < 16; i++)
     {
 	  Vdp2ParameterBPlaneAddr(&info, i, fixVdp2Regs);
       paraB.PlaneAddrv[i] = info.addr;
@@ -6275,6 +6389,7 @@ static void Vdp2DrawNBG0(void)
     // NBG0 mode
     info.enable = fixVdp2Regs->BGON & 0x1;
     if (!info.enable) return;
+    if (char_access == -1) return;
 
     if ((info.isbitmap = fixVdp2Regs->CHCTLA & 0x2) != 0)
     {
@@ -6580,6 +6695,7 @@ static void Vdp2DrawNBG1(void)
   vdp2draw_struct info;
   YglTexture texture;
   YglCache tmpc;
+
   info.dst = 0;
   info.id = 1;
   info.uclipmode = 0;
@@ -6591,14 +6707,21 @@ static void Vdp2DrawNBG1(void)
   info.enable = fixVdp2Regs->BGON & 0x2;
   if (!info.enable) return;
 
+  int char_access = 0;
+  int ptn_access = 0;
+
   for (int i = 0; i < 4; i++) {
     info.char_bank[i] = 0;
     info.pname_bank[i] = 0;
     for (int j = 0; j < 8; j++) {
-      if (AC_VRAM[i][j] == 0x05)
+      if (AC_VRAM[i][j] == 0x05) {
         info.char_bank[i] = 1;
-      if (AC_VRAM[i][j] == 0x01)
+        char_access |= (1<<j);
+      }
+      if (AC_VRAM[i][j] == 0x01) {
         info.pname_bank[i] = 1;
+        ptn_access |= (1<<j);
+      }
     }
   }
 
@@ -6883,17 +7006,6 @@ static void Vdp2DrawNBG2(void)
   info.enable = fixVdp2Regs->BGON & 0x4;
   if (!info.enable) return;
 
-  for (int i = 0; i < 4; i++) {
-    info.char_bank[i] = 0;
-    info.pname_bank[i] = 0;
-    for (int j = 0; j < 8; j++) {
-      if (AC_VRAM[i][j] == 0x06)
-        info.char_bank[i] = 1;
-      if (AC_VRAM[i][j] == 0x02)
-        info.pname_bank[i] = 1;
-    }
-  }
-  
   info.transparencyenable = !(fixVdp2Regs->BGON & 0x400);
   info.specialprimode = (fixVdp2Regs->SFPRMD >> 4) & 0x3;
 
@@ -6922,27 +7034,27 @@ static void Vdp2DrawNBG2(void)
   }
 
 
-    if (fixVdp2Regs->CCCTL & 0x4)
+  if (fixVdp2Regs->CCCTL & 0x4)
+  {
+    info.alpha = ((~fixVdp2Regs->CCRNB & 0x1F) << 3) + 0x7;
+    if (fixVdp2Regs->CCCTL & 0x100 /*&& info.specialcolormode == 0*/)
     {
-      info.alpha = ((~fixVdp2Regs->CCRNB & 0x1F) << 3) + 0x7;
-      if (fixVdp2Regs->CCCTL & 0x100 /*&& info.specialcolormode == 0*/ )
-      {
-        info.blendmode |= VDP2_CC_ADD;
-      }
-      else {
-        info.blendmode |= VDP2_CC_RATE;
-      }
+      info.blendmode |= VDP2_CC_ADD;
     }
     else {
-      // 12.14 CCRTMD
-      if (((fixVdp2Regs->CCCTL >> 9) & 0x01) == 0x01) {
-        info.alpha = ((~fixVdp2Regs->CCRNB & 0x1F) << 3) + 0x7;
-      }
-      else {
-        info.alpha = 0xFF;
-      }
-      info.blendmode |= VDP2_CC_NONE;
+      info.blendmode |= VDP2_CC_RATE;
     }
+  }
+  else {
+    // 12.14 CCRTMD
+    if (((fixVdp2Regs->CCCTL >> 9) & 0x01) == 0x01) {
+      info.alpha = ((~fixVdp2Regs->CCRNB & 0x1F) << 3) + 0x7;
+    }
+    else {
+      info.alpha = 0xFF;
+    }
+    info.blendmode |= VDP2_CC_NONE;
+  }
 
 
   Vdp2GeneratePerLineColorCalcuration(&info, NBG2);
@@ -6984,6 +7096,31 @@ static void Vdp2DrawNBG2(void)
   info.lineinc = 0;
   info.isverticalscroll = 0;
   info.x = fixVdp2Regs->SCXN2 & 0x7FF;
+
+  {
+    int char_access = 0;
+    int ptn_access = 0;
+
+    for (int i = 0; i < 4; i++) {
+      info.char_bank[i] = 0;
+      info.pname_bank[i] = 0;
+      for (int j = 0; j < 8; j++) {
+        if (AC_VRAM[i][j] == 0x06) {
+          info.char_bank[i] = 1;
+          char_access |= (1 << j);
+        }
+        if (AC_VRAM[i][j] == 0x02) {
+          info.pname_bank[i] = 1;
+          ptn_access |= (1 << j);
+        }
+      }
+    }
+
+    // Setting miss of cycle patten need to plus 8 dot vertical
+    if (Vdp2CheckCharAccessPenalty(char_access, ptn_access) != 0) {
+      info.x -= 8;
+    }
+  }
   info.y = fixVdp2Regs->SCYN2 & 0x7FF;
   Vdp2DrawMapTest(&info, &texture);
 
@@ -7006,17 +7143,6 @@ static void Vdp2DrawNBG3(void)
 
   info.enable = fixVdp2Regs->BGON & 0x8;
   if (!info.enable) return;
-
-  for (int i = 0; i < 4; i++) {
-    info.char_bank[i] = 0;
-    info.pname_bank[i] = 0;
-    for (int j = 0; j < 8; j++) {
-      if (AC_VRAM[i][j] == 0x07)
-        info.char_bank[i] = 1;
-      if (AC_VRAM[i][j] == 0x03)
-        info.pname_bank[i] = 1;
-    }
-  }
 
   info.transparencyenable = !(fixVdp2Regs->BGON & 0x800);
   info.specialprimode = (fixVdp2Regs->SFPRMD >> 6) & 0x3;
@@ -7108,10 +7234,34 @@ static void Vdp2DrawNBG3(void)
   info.lineinc = 0;
   info.isverticalscroll = 0;
   info.x = fixVdp2Regs->SCXN3 & 0x7FF;
+
+  {
+    int char_access = 0;
+    int ptn_access = 0;
+    for (int i = 0; i < 4; i++) {
+      info.char_bank[i] = 0;
+      info.pname_bank[i] = 0;
+      for (int j = 0; j < 8; j++) {
+        if (AC_VRAM[i][j] == 0x07) {
+          info.char_bank[i] = 1;
+          char_access |= (1 << j);
+        }
+        if (AC_VRAM[i][j] == 0x03) {
+          info.pname_bank[i] = 1;
+          ptn_access |= (1 << j);
+        }
+      }
+    }
+    // Setting miss of cycle patten need to plus 8 dot vertical
+    if (Vdp2CheckCharAccessPenalty(char_access, ptn_access) != 0) {
+      info.x -= 8;
+    }
+  }
   info.y = fixVdp2Regs->SCYN3 & 0x7FF;
   Vdp2DrawMapTest(&info, &texture);
 
 }
+
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -7469,14 +7619,13 @@ static void Vdp2DrawRBG0(void)
 
 //////////////////////////////////////////////////////////////////////////////
 
-void VIDOGLVdp2DrawScreens(void)
-{
-  fixVdp2Regs = Vdp2RestoreRegs(0, Vdp2Lines);
-  if (fixVdp2Regs == NULL) fixVdp2Regs = Vdp2Regs;
-  memcpy(&baseVdp2Regs, fixVdp2Regs, sizeof(Vdp2));
-  fixVdp2Regs = &baseVdp2Regs;
+void VDP2genVRamCyclePattern() {
+  int cpu_cycle_a = 0;
+  int cpu_cycle_b = 0;
+  int i = 0;
 
-  
+  fixVdp2Regs = Vdp2Regs;
+
   AC_VRAM[0][0] = (fixVdp2Regs->CYCA0L >> 12) & 0x0F;
   AC_VRAM[0][1] = (fixVdp2Regs->CYCA0L >> 8) & 0x0F;
   AC_VRAM[0][2] = (fixVdp2Regs->CYCA0L >> 4) & 0x0F;
@@ -7486,7 +7635,19 @@ void VIDOGLVdp2DrawScreens(void)
   AC_VRAM[0][6] = (fixVdp2Regs->CYCA0U >> 4) & 0x0F;
   AC_VRAM[0][7] = (fixVdp2Regs->CYCA0U >> 0) & 0x0F;
 
+  for (i = 0; i < 8; i++) {
+    if (AC_VRAM[0][i] >= 0x0E) {
+      cpu_cycle_a++;
+    }
+    else if (AC_VRAM[0][i] >= 4 && AC_VRAM[0][i] <= 7 ) {
+      if ((fixVdp2Regs->BGON & (1 << (AC_VRAM[0][i] - 4))) == 0) {
+        cpu_cycle_a++;
+      }
+    }
+  }
+
   if (fixVdp2Regs->RAMCTL & 0x100) {
+    int fcnt = 0;
     AC_VRAM[1][0] = (fixVdp2Regs->CYCA1L >> 12) & 0x0F;
     AC_VRAM[1][1] = (fixVdp2Regs->CYCA1L >> 8) & 0x0F;
     AC_VRAM[1][2] = (fixVdp2Regs->CYCA1L >> 4) & 0x0F;
@@ -7495,6 +7656,24 @@ void VIDOGLVdp2DrawScreens(void)
     AC_VRAM[1][5] = (fixVdp2Regs->CYCA1U >> 8) & 0x0F;
     AC_VRAM[1][6] = (fixVdp2Regs->CYCA1U >> 4) & 0x0F;
     AC_VRAM[1][7] = (fixVdp2Regs->CYCA1U >> 0) & 0x0F;
+    
+    for (i = 0; i < 8; i++) {
+      if (AC_VRAM[0][i] == 0x0E) {
+        if (AC_VRAM[1][i] != 0x0E) {
+          cpu_cycle_a--;
+        }
+        else {
+          if (fcnt == 0) {
+            cpu_cycle_a--;
+          }
+        }
+      }
+      if (AC_VRAM[1][i] == 0x0F) {
+        fcnt++;
+      }
+    }
+    if (fcnt == 0)cpu_cycle_a = 0;
+    if (cpu_cycle_a < 0)cpu_cycle_a = 0;
   }
   else {
     AC_VRAM[1][0] = AC_VRAM[0][0];
@@ -7516,7 +7695,20 @@ void VIDOGLVdp2DrawScreens(void)
   AC_VRAM[2][6] = (fixVdp2Regs->CYCB0U >> 4) & 0x0F;
   AC_VRAM[2][7] = (fixVdp2Regs->CYCB0U >> 0) & 0x0F;
 
+  for (i = 0; i < 8; i++) {
+    if (AC_VRAM[2][i] >= 0x0E) {
+      cpu_cycle_b++;
+    }
+    else if (AC_VRAM[2][i] >= 4 && AC_VRAM[2][i] <= 7 ) {
+      if ((fixVdp2Regs->BGON & (1 << (AC_VRAM[2][i] - 4))) == 0) {
+        cpu_cycle_b++;
+      }
+    }
+  }
+
+
   if (fixVdp2Regs->RAMCTL & 0x200) {
+    int fcnt = 0;
     AC_VRAM[3][0] = (fixVdp2Regs->CYCB1L >> 12) & 0x0F;
     AC_VRAM[3][1] = (fixVdp2Regs->CYCB1L >> 8) & 0x0F;
     AC_VRAM[3][2] = (fixVdp2Regs->CYCB1L >> 4) & 0x0F;
@@ -7525,6 +7717,24 @@ void VIDOGLVdp2DrawScreens(void)
     AC_VRAM[3][5] = (fixVdp2Regs->CYCB1U >> 8) & 0x0F;
     AC_VRAM[3][6] = (fixVdp2Regs->CYCB1U >> 4) & 0x0F;
     AC_VRAM[3][7] = (fixVdp2Regs->CYCB1U >> 0) & 0x0F;
+
+    for (i = 0; i < 8; i++) {
+      if (AC_VRAM[2][i] == 0x0E ) {
+        if (AC_VRAM[3][i] != 0x0E) {
+          cpu_cycle_b--;
+        }
+        else {
+          if (fcnt == 0) {
+            cpu_cycle_b--;
+          }
+        }
+      }
+      if (AC_VRAM[3][i] == 0x0F) {
+        fcnt++;
+      }
+    }
+    if(fcnt == 0 )cpu_cycle_b = 0;
+    if (cpu_cycle_b < 0)cpu_cycle_b = 0;
   }
   else {
     AC_VRAM[3][0] = AC_VRAM[2][0];
@@ -7537,6 +7747,37 @@ void VIDOGLVdp2DrawScreens(void)
     AC_VRAM[3][7] = AC_VRAM[2][7];
   }
 
+  //cpu_cycle_a = 1;
+  //cpu_cycle_b = 1;
+
+  if (cpu_cycle_a == 0) {
+    Vdp2External.cpu_cycle_a = 200;
+  }
+  else if (Vdp2External.cpu_cycle_a == 1) {
+    Vdp2External.cpu_cycle_a = 24;
+  }
+  else {
+    Vdp2External.cpu_cycle_a = 2;
+  }
+
+  if (cpu_cycle_b == 0) {
+    Vdp2External.cpu_cycle_b = 200;
+  }
+  else if (Vdp2External.cpu_cycle_a == 1) {
+    Vdp2External.cpu_cycle_b = 24;
+  }
+  else {
+    Vdp2External.cpu_cycle_b = 2;
+  }
+
+}
+
+void VIDOGLVdp2DrawScreens(void)
+{
+  fixVdp2Regs = Vdp2RestoreRegs(0, Vdp2Lines);
+  if (fixVdp2Regs == NULL) fixVdp2Regs = Vdp2Regs;
+  memcpy(&baseVdp2Regs, fixVdp2Regs, sizeof(Vdp2));
+  fixVdp2Regs = &baseVdp2Regs;
 
   YglUpdateColorRam();
 
