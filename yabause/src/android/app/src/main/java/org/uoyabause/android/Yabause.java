@@ -128,6 +128,9 @@ import io.reactivex.ObservableOnSubscribe;
 import io.reactivex.ObservableEmitter;
 import io.reactivex.schedulers.Schedulers;
 
+import static android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+import static android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+import static android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
 import static org.uoyabause.android.SelInputDeviceFragment.PLAYER1;
 import static org.uoyabause.android.SelInputDeviceFragment.PLAYER2;
 
@@ -175,6 +178,7 @@ public class Yabause extends AppCompatActivity implements
   private ProgressDialog mProgressDialog;
   private Boolean isShowProgress;
   private String gameCode;
+  private String testCase = "";
 
   void print(String msg) {
     StackTraceElement calledClass = Thread.currentThread().getStackTrace()[3];
@@ -252,7 +256,9 @@ public class Yabause extends AppCompatActivity implements
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
       getWindow().getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER;
     }
-
+    if( sharedPref.getBoolean("pref_immersive_mode", false)) {
+      getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+    }
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     mDrawerLayout = (DrawerLayout) findViewById(R.id.drawer_layout);
     updateViewLayout(getResources().getConfiguration().orientation);
@@ -260,6 +266,17 @@ public class Yabause extends AppCompatActivity implements
     mNavigationView = (NavigationView) findViewById(R.id.nav_view);
     mNavigationView.setNavigationItemSelectedListener(this);
     Menu menu = mNavigationView.getMenu();
+
+    if(BuildConfig.BUILD_TYPE != "debug" ) {
+      MenuItem rec = menu.findItem(R.id.record);
+      if( rec != null ){
+        rec.setVisible(false);
+      }
+      MenuItem play = menu.findItem(R.id.play);
+      if( play != null ){
+        play.setVisible(false);
+      }
+    }
 
     DrawerLayout.DrawerListener drawerListener = new DrawerLayout.DrawerListener() {
       @Override
@@ -324,6 +341,14 @@ public class Yabause extends AppCompatActivity implements
 
     audio = new YabauseAudio(this);
     Intent intent = getIntent();
+
+    Bundle bundle = intent.getExtras();
+    if (bundle != null) {
+      for (String key : bundle.keySet()) {
+        Log.e(TAG, key + " : " + (bundle.get(key) != null ? bundle.get(key) : "NULL"));
+      }
+    }
+
     String game = intent.getStringExtra("org.uoyabause.android.FileName");
     if (game != null && game.length() > 0) {
       YabauseStorage storage = YabauseStorage.getStorage();
@@ -336,17 +361,39 @@ public class Yabause extends AppCompatActivity implements
       gamepath = exgame;
     }
 
+    Log.d(TAG,"File is " + gamepath );
+
     String gameCode = intent.getStringExtra("org.uoyabause.android.gamecode");
     if (gameCode != null) {
       this.gameCode = gameCode;
     }else {
-      GameInfo gf = GameInfo.getFromFileName(gamepath);
-      this.gameCode = gf.product_number;
+      GameInfo gameinfo = GameInfo.getFromFileName(gamepath);
+      if( gameinfo != null ) {
+        this.gameCode = gameinfo.product_number;
+      }else{
+        if (gamepath.toUpperCase().endsWith("CUE")) {
+          gameinfo = GameInfo.genGameInfoFromCUE(gamepath);
+        } else if (gamepath.toUpperCase().endsWith("MDS")) {
+          gameinfo = GameInfo.genGameInfoFromMDS(gamepath);
+        } else if (gamepath.toUpperCase().endsWith("CCD")) {
+          gameinfo = GameInfo.genGameInfoFromMDS(gamepath);
+        } else if (gamepath.toUpperCase().endsWith("CHD")) {
+          gameinfo = GameInfo.genGameInfoFromCHD(gamepath);
+        } else {
+          gameinfo = GameInfo.genGameInfoFromIso(gamepath);
+        }
+        if( gameinfo != null ) {
+          this.gameCode = gameinfo.product_number;
+        }
+      }
     }
 
+    testCase = intent.getStringExtra("TestCase");
 
     PreferenceManager.setDefaultValues(this, R.xml.preferences, false);
-    readPreferences(this.gameCode);
+    if( this.gameCode != null ) {
+      readPreferences(this.gameCode);
+    }
 
     padm = PadManager.getPadManager();
     padm.loadSettings();
@@ -384,21 +431,22 @@ public class Yabause extends AppCompatActivity implements
 
     getWindow().setStatusBarColor(getResources().getColor(R.color.black));
 
-    View decorView = findViewById(R.id.drawer_layout);
-    if( decorView != null ) {
-      if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+    SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
+    int immersiveFlags = 0;
+    if(sharedPref.getBoolean("pref_immersive_mode", false)){
+      immersiveFlags = (View.SYSTEM_UI_FLAG_HIDE_NAVIGATION  | SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+    }
+
+    View decorView = getWindow().getDecorView();
+    if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
         decorView.setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        //| View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | immersiveFlags
+                        | SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                         | View.SYSTEM_UI_FLAG_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
-      }
-
-      if (orientation == Configuration.ORIENTATION_PORTRAIT) {
-        decorView.setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
-      }
+                        | SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+    }else if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+        decorView.setSystemUiVisibility( View.SYSTEM_UI_FLAG_LAYOUT_STABLE | immersiveFlags  );
     }
   }
 
@@ -784,7 +832,17 @@ public class Yabause extends AppCompatActivity implements
         transaction.show(fragment);
         transaction.commit();
       }
+
+      case R.id.record: {
+        YabauseRunnable.record( YabauseStorage.getStorage().getRecordPath() );
+      }
       break;
+
+      case R.id.play: {
+        //YabauseRunnable.play( YabauseStorage.getStorage().getRecordPath() );
+      }
+      break;
+
       case R.id.menu_item_backup: {
         waiting_reault = true;
         FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
@@ -998,7 +1056,7 @@ public class Yabause extends AppCompatActivity implements
 
             FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
             transaction.remove(fragment);
-            transaction.commit();
+            transaction.commitNow();
 
 
             waiting_reault = false;
@@ -1129,7 +1187,11 @@ public class Yabause extends AppCompatActivity implements
 
   @Override
   public void show() {
-    this.toggleMenu();
+    if( YabauseRunnable.getRecordingStatus() == YabauseRunnable.RECORDING ) {
+      YabauseRunnable.screenshot("");
+    }else {
+      this.toggleMenu();
+    }
   }
 
 
@@ -1306,7 +1368,7 @@ public class Yabause extends AppCompatActivity implements
       return;
     }
     AsyncReportv2 asyncTask = new AsyncReportv2(this);
-    String url = "http://www.uoyabause.org/api/";
+    String url = "https://www.uoyabause.org/api/";
     //url = "http://www.uoyabause.org:3000/api/";
     asyncTask.execute(url, YabauseRunnable.getCurrentGameCode());
 
@@ -1371,7 +1433,7 @@ public class Yabause extends AppCompatActivity implements
         }
 
         //asyncTask.execute("http://192.168.0.7:3000/api/", YabauseRunnable.getCurrentGameCode());
-        asyncTask.execute("http://www.uoyabause.org/api/", YabauseRunnable.getCurrentGameCode());
+        asyncTask.execute("https://www.uoyabause.org/api/", YabauseRunnable.getCurrentGameCode());
 
         return;
 
@@ -1829,6 +1891,13 @@ public class Yabause extends AppCompatActivity implements
 
   public String getGamePath() {
     return gamepath;
+  }
+
+  public String getTestPath() {
+    if( testCase == null ){
+      return null;
+    }
+    return YabauseStorage.getStorage().getRecordPath() + this.testCase;
   }
 
   public String getMemoryPath() {
