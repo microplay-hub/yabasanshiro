@@ -345,7 +345,8 @@ endif
 ifeq ($(DEBUG), 1)
 	FLAGS += -O0 -g
 else
-	FLAGS += -O1 -DNDEBUG # quick fix for odroidn2 / other arm boards
+	FLAGS += -O3 -DNDEBUG
+        FLAGS += -fno-tree-tail-merge #workaround segfault on N2 and possibly other ARM boards
 endif
 
 ifeq ($(HAVE_MUSASHI), 1)
