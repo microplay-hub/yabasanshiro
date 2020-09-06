@@ -530,18 +530,6 @@ void retro_reinit_av_info(void)
 
 void retro_set_resolution()
 {
-   // If resolution_mode > initial_resolution_mode, we'll need a restart to reallocate the max size for buffer
-   if (resolution_mode > initial_resolution_mode)
-   {
-      log_cb(RETRO_LOG_INFO, "Restart the core for x%d resolution\n", resolution_mode);
-      resolution_mode = initial_resolution_mode;
-   }
-   // Downscale resolution_mode for Hi-Res games
-   if (game_height > 256 && resolution_mode > max_resolution_mode/2)
-   {
-      log_cb(RETRO_LOG_INFO, "Halving Hi-Res games resolution mode\n", resolution_mode);
-      resolution_mode = max_resolution_mode/2;
-   }
    switch(resolution_mode)
    {
       case RES_ORIGINAL:
@@ -808,6 +796,7 @@ void check_variables(void)
       {
          g_resolution_mode = RES_NATIVE;
       }
+#endif
    }
 
 #ifdef ALLOW_POLYGON_MODE
@@ -828,14 +817,6 @@ void check_variables(void)
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
    memset(info, 0, sizeof(*info));
-
-   if(initial_resolution_mode == 0)
-   {
-      // Get the initial resolution mode at start
-      // It will be the resolution_mode limit until the core is restarted
-      check_variables();
-      initial_resolution_mode = resolution_mode;
-   }
 
    info->timing.fps            = (retro_get_region() == RETRO_REGION_NTSC) ? 60.0f : 50.0f;
    info->timing.sample_rate    = SAMPLERATE;
