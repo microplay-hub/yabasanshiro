@@ -982,7 +982,7 @@ bool retro_load_game_common()
    yinit.use_new_scsp              = 1;
    yinit.scsp_sync_count_per_frame = 1;
    yinit.extend_backup             = 1;
-   yinit.scsp_main_mode            = 1;
+   yinit.scsp_main_mode            = 0;
    yinit.videoformattype           = VIDEOFORMATTYPE_NTSC;
    yinit.video_filter_type         = 0;
 
