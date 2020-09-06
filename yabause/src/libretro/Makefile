@@ -345,7 +345,7 @@ endif
 ifeq ($(DEBUG), 1)
 	FLAGS += -O0 -g
 else
-	FLAGS += -O3 -DNDEBUG
+	FLAGS += -O1 -DNDEBUG # quick fix for odroidn2 / other arm boards
 endif
 
 ifeq ($(HAVE_MUSASHI), 1)
