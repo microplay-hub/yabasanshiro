@@ -17,7 +17,10 @@ USE_X86_DRC = 0
 USE_RTHREADS = 1
 ARCH_IS_LINUX = 0
 ARCH_IS_MACOSX = 0
+ARCH_IS_WINDOWS = 0
 FORCE_GLEW = 0
+HAVE_SYS_PARAM_H = 1
+HAVE_FSEEKO = 0
 
 ifeq ($(platform),)
 	platform = unix
@@ -64,7 +67,7 @@ ifneq (,$(findstring unix,$(platform)))
 	TARGET := $(TARGET_NAME)_libretro.so
 	fpic := -fPIC
 	SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
-	LDFLAGS += -lpthread -lGL
+	LDFLAGS += -lpthread
 	ARCH_IS_LINUX = 1
 	# ARM
 	ifneq (,$(findstring armv,$(platform)))
@@ -96,8 +99,8 @@ else ifeq ($(platform), arm64)
 	TARGET := $(TARGET_NAME)_libretro.so
 	fpic := -fPIC
 	SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
-	LDFLAGS += -lpthread -lGL
-	FLAGS +=  -DAARCH64
+	LDFLAGS += -lpthread
+	FLAGS += -DAARCH64
 	ARCH_IS_LINUX = 1
 	HAVE_SSE = 0
 	USE_AARCH64_DRC = 1
@@ -147,7 +150,7 @@ else ifneq (,$(findstring rockpro64,$(platform)))
 	TARGET := $(TARGET_NAME)_libretro.so
 	fpic := -fPIC
 	SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
-	LDFLAGS += -lpthread -lGL
+	LDFLAGS += -lpthread
 	ARCH_IS_LINUX = 1
 	HAVE_SSE = 0
 	FORCE_GLES = 1
@@ -163,8 +166,8 @@ else ifeq ($(platform), odroid-n2)
 	TARGET := $(TARGET_NAME)_libretro.so
 	fpic := -fPIC
 	SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
-	LDFLAGS += -lpthread -lGL
-	FLAGS +=  -DAARCH64
+	LDFLAGS += -lpthread
+	FLAGS += -DAARCH64
 	ARCH_IS_LINUX = 1
 	HAVE_SSE = 0
 	FORCE_GLES = 1
@@ -184,9 +187,9 @@ else ifneq (,$(findstring odroid,$(platform)))
 	TARGET := $(TARGET_NAME)_libretro.so
 	fpic := -fPIC
 	SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
-	LDFLAGS += -lpthread -lGL
+	LDFLAGS += -lpthread
 	ARCH_IS_LINUX = 1
-	BOARD := $(shell cat /proc/cpuinfo | grep -i odroid | awk '{print $$3}')
+	BOARD ?= $(shell cat /proc/cpuinfo | grep -i odroid | awk '{print $$3}')
 
 	ifneq (,$(findstring ODROID-XU3,$(BOARD)))
 		HAVE_SSE = 0
@@ -231,7 +234,7 @@ else ifneq (,$(findstring osx,$(platform)))
 	ifeq ($(arch),ppc)
 		ENDIANNESS_DEFINES := -DWORDS_BIGENDIAN -DMSB_FIRST -D__ppc__
 	endif
-	LDFLAGS += -lpthread -framework OpenGL
+	LDFLAGS += -lpthread
 
 else ifneq (,$(findstring ios,$(platform)))
 	# iOS
@@ -239,7 +242,7 @@ else ifneq (,$(findstring ios,$(platform)))
 	fpic := -fPIC
 	SHARED := -dynamiclib
 	CC = clang -arch armv7 -isysroot $(IOSSDK)
-	CC_AS =  perl ./libretro/gas-preprocessor.pl $(CC)
+	CC_AS = perl ./libretro/gas-preprocessor.pl $(CC)
 	CXX = clang++ -arch armv7 -isysroot $(IOSSDK)
 
 # sncps3
@@ -296,11 +299,13 @@ else ifeq ($(platform), gcw0)
 # Windows
 else
 	TARGET := $(TARGET_NAME)_libretro.dll
-	CC = gcc
-	CXX = g++
+	CC ?= gcc
+	CXX ?= g++
 	SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
-	LDFLAGS += -static-libgcc -static-libstdc++ -lwinmm -lopengl32
-	FLAGS += -DHAVE_WFOPEN -D_WINDOWS
+	LDFLAGS += -static-libgcc -static-libstdc++ -lwinmm
+	FLAGS += -D_WINDOWS
+	HAVE_FSEEKO = 1
+	ARCH_IS_WINDOWS = 1
 
 endif
 
@@ -399,13 +404,10 @@ FLAGS += $(fpic)
 INCFLAGS := $(foreach dir,$(INCLUDE_DIRS),-I$(dir))
 
 WARNINGS :=
-FLAGS += $(INCFLAGS) -D__LIBRETRO__ $(ENDIANNESS_DEFINES) $(WARNINGS) \
-	-DNO_CLI -DHAVE_BUILTIN_BSWAP16=1 -DHAVE_BUILTIN_BSWAP32=1 -DHAVE_C99_VARIADIC_MACROS=1 \
-	-DHAVE_FLOORF=1 -DHAVE_GETTIMEOFDAY=1 -DHAVE_STDINT_H=1 -DHAVE_SYS_TIME_H=1 -DIMPROVED_SAVESTATES \
-	-DHAVE_LIBGL -DVERSION=\"2.5.1\"
+FLAGS += $(INCFLAGS) $(ENDIANNESS_DEFINES) $(WARNINGS)
 
 CXXFLAGS += $(FLAGS) -std=gnu++11
-CFLAGS += $(FLAGS) -std=gnu99
+CFLAGS += $(FLAGS) -std=gnu11
 
 all: $(TARGET)
 
