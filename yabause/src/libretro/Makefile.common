@@ -11,7 +11,7 @@ ifneq ($(GIT_VERSION)," unknown")
 	FLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 endif
 
-FLAGS += -D__LIBRETRO__ -DHAVE_LIBGL -DVERSION=\"3.3.1\" -DHAVE_LROUND -D_7ZIP_ST -DFLAC__HAS_OGG=0 -DFLAC__NO_DLL \
+FLAGS += -D__LIBRETRO__ -DHAVE_LIBGL -DVERSION=\"3.4.2\" -DHAVE_LROUND -D_7ZIP_ST -DFLAC__HAS_OGG=0 -DFLAC__NO_DLL \
 	-DNO_CLI -DHAVE_BUILTIN_BSWAP16=1 -DHAVE_BUILTIN_BSWAP32=1 -DHAVE_C99_VARIADIC_MACROS=1 -DHAVE_FLOORF=1 \
 	-DHAVE_GETTIMEOFDAY=1 -DHAVE_STDINT_H=1 -DHAVE_SYS_TIME_H=1 -DIMPROVED_SAVESTATES
 
@@ -117,8 +117,6 @@ SOURCES_C := $(SOURCE_DIR)/osdcore.c \
 	$(SOURCE_DIR)/ygles.c \
 	$(SOURCE_DIR)/yglshaderes.c \
 	$(SOURCE_DIR)/snddummy.c \
-	$(SOURCE_DIR)/vdp1.c \
-	$(SOURCE_DIR)/vdp2.c \
 	$(SOURCE_DIR)/vidshared.c \
 	$(SOURCE_DIR)/vidsoft.c \
 	$(SOURCE_DIR)/titan/titan.c \
@@ -175,7 +173,9 @@ else
 endif
 
 SOURCES_CXX := $(SOURCE_DIR)/Counter.cpp \
-	$(SOURCE_DIR)/ygl_texture.cpp
+	$(SOURCE_DIR)/ygl_texture.cpp \
+        $(SOURCE_DIR)/vdp1.cpp \
+        $(SOURCE_DIR)/vdp2.cpp 
 
 ifeq ($(HAVE_MUSASHI), 1)
 	SOURCES_C += $(SOURCE_DIR)/musashi/m68kcpu.c \
