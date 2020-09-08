@@ -328,6 +328,7 @@ ifeq ($(DEBUG), 1)
 	FLAGS += -O0 -g
 else
 	FLAGS += -O3 -DNDEBUG
+        FLAGS += -fno-tree-tail-merge #workaround segfault on N2 and possibly other ARM boards
 endif
 
 OBJECTS += $(OBJECTS_C) $(OBJECTS_CXX) $(OBJECTS_S)

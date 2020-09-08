@@ -186,7 +186,7 @@ int YabauseInit(yabauseinit_struct *init)
   q_scsp_finish = YabThreadCreateQueue(1);
   setM68kCounter(0);
 
-#ifndef __LIBRETRO__
+#if !(defined(__LIBRETRO__))
   if( init->playRecordPath && strlen(init->playRecordPath) != 0) {
     PlayRecorder_setPlayMode(init->playRecordPath,init);
   }
@@ -643,7 +643,8 @@ u64 g_m68K_dec_cycle = 0;
 int YabauseEmulate(void) {
    int oneframeexec = 0;
    yabsys.frame_count++;
-#ifndef __LIBRETRO__
+
+#if !defined(__LIBRETRO__)
    PlayRecorder_proc(yabsys.frame_count);
 #endif
 
