@@ -74,10 +74,10 @@ libretro-build-linux-i686:
     - .libretro-linux-i686-make-default
     - .core-defs
 
-# MacOS ARM 64-bit
-libretro-build-osx-arm64:
+# MacOS 64-bit
+libretro-build-osx-x64:
   extends:
-    - .libretro-osx-arm64-make-default
+    - .libretro-osx-x64-make-default
     - .core-defs
 
 ################################### CELLULAR #################################
