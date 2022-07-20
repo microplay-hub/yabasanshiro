@@ -74,6 +74,7 @@ pid_t gettid(void)
 
 // Thread handles for each Yabause subthread
 static pthread_t thread_handle[YAB_NUM_THREADS];
+static int * used_cpu_cores = NULL;
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -81,7 +82,26 @@ static void dummy_sighandler(int signum_unused) {}  // For thread sleep/wake
 
 extern "C" {
 
-int YabThreadStart(unsigned int id, void* (*func)(void *), void *arg)
+int YabThreadInit(){
+
+  int cpu_count = sysconf(_SC_NPROCESSORS_CONF);
+  if( used_cpu_cores != NULL ){
+    delete [] used_cpu_cores;
+  }
+  used_cpu_cores = new int[cpu_count];
+  for( int i=0; i<cpu_count; i++  ){
+    used_cpu_cores[i] = 0;
+  }
+
+  memset( thread_handle, 0, sizeof(pthread_t) * YAB_NUM_THREADS );
+
+  pthread_t self_thread = pthread_self();
+  pthread_setname_np(self_thread,"yaba main");  
+
+  return 0;
+}
+
+int YabThreadStart(unsigned int id, const char * name, void* (*func)(void *), void *arg)
 {
    // Set up a dummy signal handler for SIGUSR1 so we can return from pause()
    // in YabThreadSleep()
@@ -98,11 +118,20 @@ int YabThreadStart(unsigned int id, void* (*func)(void *), void *arg)
       return -1;
    }
 
-   if (pthread_create(&thread_handle[id], NULL, func, arg) != 0)
+  pthread_attr_t attr;
+
+  if (pthread_attr_init(&attr) != 0) {
+      perror("Error in pthread_attr_init()");
+      exit(EXIT_FAILURE);
+  }   
+
+   if (pthread_create(&thread_handle[id], &attr, func, arg) != 0)
    {
       perror("pthread_create");
       return -1;
    }
+
+   pthread_setname_np(thread_handle[id], name);
 
    return 0;
 }
@@ -283,12 +312,47 @@ void YabThreadFreeMutex( YabMutex * mtx ){
     }
 }
 
+
+int YabThreadGetFastestCpuIndex(){
+//#if defined(IOS) || defined(__JETSON__)
+  return 0;
+/*#else  
+    unsigned int cpu_f = 0;
+    unsigned int max_cpu_index = 0;
+    char fname[128];
+    char buf[64];
+
+    int cpu_count = sysconf(_SC_NPROCESSORS_CONF);
+
+  
+    // Find Fastest CPU
+    for ( int cpuindex = 0; cpuindex < cpu_count; cpuindex++){
+        sprintf(fname, "/sys/devices/system/cpu/cpu%d/cpufreq/cpuinfo_max_freq", cpuindex);
+        FILE * fp = fopen(fname, "r");
+        if (fp){
+            fread(buf, 1, 64, fp);
+            unsigned int tmp = atoi(buf);
+            fclose(fp);
+            if( tmp >= cpu_f && used_cpu_cores[cpuindex] == 0 ){
+                max_cpu_index = cpuindex;
+                cpu_f = tmp;
+            }
+        }
+    }
+
+    used_cpu_cores[max_cpu_index] = 1;
+    return max_cpu_index;
+#endif*/    
+}
+
+
+
 void YabThreadSetCurrentThreadAffinityMask(int mask)
 {
-#if defined(__XU4__)
+//#if defined(__XU4__)
 	return;
 #endif
-#if !defined(ANDROID) // it needs more than android-21
+/*#if !defined(ANDROID) // it needs more than android-21
     int err, syscallres;
 #ifdef SYS_gettid
     pid_t pid = syscall(SYS_gettid);
@@ -308,7 +372,8 @@ void YabThreadSetCurrentThreadAffinityMask(int mask)
 //    CPU_SET(mask, &my_set);
 //	CPU_SET(mask+4, &my_set);
 //    sched_setaffinity(pid,sizeof(my_set), &my_set);
-#endif
+#endif*/
+  return;
 }
 
 #include <sys/syscall.h>
@@ -337,7 +402,9 @@ int YabThreadGetCurrentThreadAffinityMask()
 }
 
 int YabMakeCleanDir( const char * dirname ){
-#if defined(ANDROID)
+#if defined(IOS)
+  return 0;
+#elif defined(ANDROID)
   std::string cmd;
   cmd = "exec rm -r " + std::string(dirname) + "/*";
   system(cmd.c_str());
@@ -353,7 +420,9 @@ int YabMakeCleanDir( const char * dirname ){
 }
 
 int YabCopyFile( const char * src, const char * dst) {
-#if defined(ANDROID)
+#if defined(IOS)
+  return 0;
+#elif defined(ANDROID)
   std::string cmd;
   cmd = "exec cp -f " + std::string(src) + " " + std::string(dst);
   system(cmd.c_str());
@@ -367,6 +436,17 @@ int YabCopyFile( const char * src, const char * dst) {
 }
 
 
+ #include <time.h>
+
+int YabNanosleep(u64 ns) {
+  struct timespec ts;
+  ts.tv_sec = 0;
+  ts.tv_nsec = ns*1000;   
+  nanosleep(&ts,NULL);
+  return 0;
+}
+
 } // extern "C"
 
 //////////////////////////////////////////////////////////////////////////////
+

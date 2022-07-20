@@ -143,6 +143,8 @@ void VIDOGLSetSettingValueMode(int type, int value);
 void VIDOGLSync();
 void VIDOGLGetNativeResolution(int *width, int *height, int*interlace);
 void VIDOGLVdp2DispOff(void);
+void VIDOGLOnUpdateColorRamWord(u32 addr);
+void VIDOGLVulkanGetScreenshot(void ** outbuf, int * width, int * height) { return;  }
 
 VideoInterface_struct VIDOGL = {
 VIDCORE_OGL,
@@ -175,7 +177,9 @@ YglGetGlSize,
 VIDOGLSetSettingValueMode,
 VIDOGLSync,
 VIDOGLGetNativeResolution,
-VIDOGLVdp2DispOff
+VIDOGLVdp2DispOff,
+VIDOGLOnUpdateColorRamWord,
+VIDOGLVulkanGetScreenshot
 };
 
 float vdp1wratio = 1;
@@ -264,60 +268,61 @@ u32 FASTCALL Vdp2ColorRamGetColorCM2(vdp2draw_struct * info, u32 colorindex, int
 
 static INLINE void Vdp1MaskSpritePixel(int type, u16 * pixel, int *colorcalc)
 {
+  // revert pre-colorcalc mask, until I remember why do it.
   switch (type)
   {
   case 0x0:
   {
-    *pixel |= (*colorcalc & 0x07) << 11;
+    //*pixel |= (*colorcalc & 0x07) << 11;
     *colorcalc = (*pixel >> 11) & 0x7;
     *pixel &= 0x7FF;
     break;
   }
   case 0x1:
   {
-    *pixel |= (*colorcalc & 0x03) << 11;
+    //*pixel |= (*colorcalc & 0x03) << 11;
     *colorcalc = (*pixel >> 11) & 0x3;
     *pixel &= 0x7FF;
     break;
   }
   case 0x2:
   {
-    *pixel |= (*colorcalc & 0x07) << 11;
+    //*pixel |= (*colorcalc & 0x07) << 11;
     *colorcalc = (*pixel >> 11) & 0x7;
     *pixel &= 0x7FF;
     break;
   }
   case 0x3:
   {
-    *pixel |= (*colorcalc & 0x03) << 11;
+    //*pixel |= (*colorcalc & 0x03) << 11;
     *colorcalc = (*pixel >> 11) & 0x3;
     *pixel &= 0x7FF;
     break;
   }
   case 0x4:
   {
-    *pixel |= (*colorcalc & 0x07) << 10;
+    //*pixel |= (*colorcalc & 0x07) << 10;
     *colorcalc = (*pixel >> 10) & 0x7;
     *pixel &= 0x3FF;
     break;
   }
   case 0x5:
   {
-    *pixel |= (*colorcalc & 0x01) << 11;
+    //*pixel |= (*colorcalc & 0x01) << 11;
     *colorcalc = (*pixel >> 11) & 0x1;
     *pixel &= 0x7FF;
     break;
   }
   case 0x6:
   {
-    *pixel |= (*colorcalc & 0x03) << 10;
+    //*pixel |= (*colorcalc & 0x03) << 10;
     *colorcalc = (*pixel >> 10) & 0x3;
     *pixel &= 0x3FF;
     break;
   }
   case 0x7:
   {
-    *pixel |= (*colorcalc & 0x09) << 7;
+    //*pixel |= (*colorcalc & 0x09) << 7;
     *colorcalc = (*pixel >> 9) & 0x7;
     *pixel &= 0x1FF;
     break;
@@ -330,7 +335,7 @@ static INLINE void Vdp1MaskSpritePixel(int type, u16 * pixel, int *colorcalc)
   }
   case 0x9:
   {
-    *pixel |= (*colorcalc & 0x01) << 6;
+    //*pixel |= (*colorcalc & 0x01) << 6;
     *colorcalc = (*pixel >> 6) & 0x1;
     *pixel &= 0x3F;
     break;
@@ -343,7 +348,7 @@ static INLINE void Vdp1MaskSpritePixel(int type, u16 * pixel, int *colorcalc)
   }
   case 0xB:
   {
-    *pixel |= (*colorcalc & 0x03) << 6;
+    //*pixel |= (*colorcalc & 0x03) << 6;
     *colorcalc = (*pixel >> 6) & 0x3;
     *pixel &= 0x3F;
     break;
@@ -356,7 +361,7 @@ static INLINE void Vdp1MaskSpritePixel(int type, u16 * pixel, int *colorcalc)
   }
   case 0xD:
   {
-    *pixel |= (*colorcalc & 0x01) << 6;
+    //*pixel |= (*colorcalc & 0x01) << 6;
     *colorcalc = (*pixel >> 6) & 0x1;
     *pixel &= 0xFF;
     break;
@@ -369,7 +374,7 @@ static INLINE void Vdp1MaskSpritePixel(int type, u16 * pixel, int *colorcalc)
   }
   case 0xF:
   {
-    *pixel |= (*colorcalc & 0x03) << 6;
+    //*pixel |= (*colorcalc & 0x03) << 6;
     *colorcalc = (*pixel >> 6) & 0x3;
     *pixel &= 0xFF;
     break;
@@ -1235,7 +1240,7 @@ u32 FASTCALL Vdp2ColorRamGetColorCM2(vdp2draw_struct * info, u32 colorindex, int
   return SAT2YAB2(alpha, tmp1, tmp2);
 }
 
-static int Vdp2SetGetColor(vdp2draw_struct * info)
+int Vdp2SetGetColor(vdp2draw_struct * info)
 {
   switch (Vdp2Internal.ColorMode)
   {
@@ -3527,8 +3532,12 @@ void Vdp2DrawRotationThread(void * p) {
 #endif
 
   printf("Vdp2DrawRotationThread\n");
+
+  if( yabsys.use_cpu_affinity ){
+    YabThreadSetCurrentThreadAffinityMask(YabThreadGetFastestCpuIndex());
+  }
+
   while (Vdp2DrawRotationThread_running) {
-    YabThreadSetCurrentThreadAffinityMask(0x02);
     YabThreadLock(g_rotate_mtx);
     if (Vdp2DrawRotationThread_running == 0) {
       break;
@@ -3710,7 +3719,7 @@ static void FASTCALL Vdp2DrawRotation(RBGDrawInfo * rbg)
       Vdp2DrawRotationThread_running = 1;
       g_rotate_mtx = YabThreadCreateMutex();
       YabThreadLock(g_rotate_mtx);
-      YabThreadStart(YAB_THREAD_VIDSOFT_LAYER_RBG0, Vdp2DrawRotationThread, NULL);
+      YabThreadStart(YAB_THREAD_VIDSOFT_LAYER_RBG0, "vdp rotate", Vdp2DrawRotationThread, NULL);
     }
     Vdp2RgbTextureSync();
     YGL_THREAD_DEBUG("Vdp2DrawRotation in %d\n", curret_rbg->vdp2_sync_flg);
@@ -4334,7 +4343,7 @@ static void Vdp2DrawRotation_in(RBGDrawInfo * rbg) {
 
 //////////////////////////////////////////////////////////////////////////////
 
-static void SetSaturnResolution(int width, int height)
+void SetSaturnResolution(int width, int height)
 {
   YglChangeResolution(width, height);
   YglSetDensity((vdp2_interlace == 0) ? 1 : 2);
@@ -4369,7 +4378,7 @@ static void SetSaturnResolution(int width, int height)
 
         if (_Ygl->rotate_screen) {
           if (_Ygl->isFullScreen) {
-            if (GlHeight > GlWidth) {
+            if (  (GlHeight * hrate) > GlWidth) {
               _Ygl->originy = (GlHeight - GlWidth  * wrate);
               GlHeight = _Ygl->screen_width * wrate;
             }
@@ -4385,7 +4394,7 @@ static void SetSaturnResolution(int width, int height)
         }
         else {
           if (_Ygl->isFullScreen) {
-            if (GlHeight > GlWidth) {
+            if (  (GlHeight * wrate) > GlWidth) {
               _Ygl->originy = (GlHeight - GlWidth  * hrate);
               GlHeight = _Ygl->screen_width * hrate;
             }
@@ -4729,14 +4738,11 @@ void VIDOGLVdp1ScaledSpriteDraw(u8 * ram, Vdp1 * regs, u8* back_framebuffer)
   int i;
 
   Vdp1ReadCommand(&cmd, Vdp1Regs->addr, Vdp1Ram);
-  if (cmd.CMDSIZE == 0) {
-    return; // BAD Command
-  }
 
   sprite.dst = 0;
   sprite.blendmode = VDP1_COLOR_CL_REPLACE;
   sprite.linescreen = 0;
-
+  
   if ((cmd.CMDYA & 0x1000)) cmd.CMDYA |= 0xE000; else cmd.CMDYA &= ~(0xE000);
   if ((cmd.CMDYC & 0x1000)) cmd.CMDYC |= 0xE000; else cmd.CMDYC &= ~(0xE000);
   if ((cmd.CMDYB & 0x1000)) cmd.CMDYB |= 0xE000; else cmd.CMDYB &= ~(0xE000);
@@ -4747,6 +4753,11 @@ void VIDOGLVdp1ScaledSpriteDraw(u8 * ram, Vdp1 * regs, u8* back_framebuffer)
   sprite.w = ((cmd.CMDSIZE >> 8) & 0x3F) * 8;
   sprite.h = cmd.CMDSIZE & 0xFF;
   sprite.flip = (cmd.CMDCTRL & 0x30) >> 4;
+
+  if (cmd.CMDSIZE == 0) {
+    sprite.w = 1;
+    sprite.h = 1;
+  }
 
   // Setup Zoom Point
   switch ((cmd.CMDCTRL & 0xF00) >> 8)
@@ -5172,7 +5183,7 @@ void VIDOGLVdp1DistortedSpriteDraw(u8 * ram, Vdp1 * regs, u8* back_framebuffer)
     Vdp1ReadTexture(&cmd, &sprite, &texture);
   }
   return;
-      }
+}
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -6533,7 +6544,7 @@ static void Vdp2DrawNBG0(void)
     ReadPlaneSizeR(&paraB, fixVdp2Regs->PLSZ >> 12);
     for (int i = 0; i < 16; i++)
     {
-	  Vdp2ParameterBPlaneAddr(&info, i, fixVdp2Regs);
+	    Vdp2ParameterBPlaneAddr(&info, i, fixVdp2Regs);
       paraB.PlaneAddrv[i] = info.addr;
     }
 
