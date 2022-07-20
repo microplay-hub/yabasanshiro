@@ -48,6 +48,12 @@ extern "C" {
 #if defined(__LIBRETRO__) && !defined(_USEGLEW_)
     #include <glsym/glsym.h>
     #include <glsm/glsm.h>
+
+#define GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 0x90EB
+#define GL_MAX_COMPUTE_WORK_GROUP_COUNT   0x91BE
+#define GL_MAX_COMPUTE_WORK_GROUP_SIZE    0x91BF
+#define GL_ALL_BARRIER_BITS               0xFFFFFFFF
+
 #elif defined(__ANDROID__)
     #include <GLES3/gl31.h>
     #include <GLES3/gl3ext.h>

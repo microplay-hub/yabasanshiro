@@ -296,4 +296,14 @@ YabMutex * YabThreadCreateMutex()
 	return (YabMutex *)mtx;
 }
 
+#include "retro_timers.h"
+
+int YabNanosleep(u64 ns) {
+  struct timespec ts;
+  ts.tv_sec = 0;
+  ts.tv_nsec = ns*1000;   
+  nanosleep(&ts,NULL);
+  return 0;
+}
+
 //////////////////////////////////////////////////////////////////////////////
