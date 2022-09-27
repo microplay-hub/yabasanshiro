@@ -63,9 +63,15 @@ static int hnd_key_once = 0;
 #endif
 #endif
 
+
+int YabThreadInit(){
+    return 0;
+}
+
+
 //////////////////////////////////////////////////////////////////////////////
 
-int YabThreadStart(unsigned int id, void * (*func)(void *), void *arg)
+int YabThreadStart(unsigned int id, const char * name, void * (*func)(void *), void *arg)
 {
 #ifdef _WIN32
 #ifdef HAVE_THREAD_STORAGE
@@ -183,11 +189,17 @@ void YabThreadUSleep( unsigned int stime )
 #endif
 }
 
+int YabThreadGetFastestCpuIndex(){
+  return 0;
+}
+
+
 void YabThreadSetCurrentThreadAffinityMask(int mask)
 {
 #if defined(_WIN32)
 	SetThreadIdealProcessor(GetCurrentThread(), mask);
-#elif !defined(ANDROID) // it needs more than android-21
+//#elif !defined(ANDROID) // it needs more than android-21
+#else
 	int err, syscallres;
 	pid_t pid = syscall(SYS_gettid);
 	mask = 1 << mask;
@@ -282,6 +294,16 @@ YabMutex * YabThreadCreateMutex()
 	YabMutex_rthreads * mtx = (YabMutex_rthreads *)malloc(sizeof(YabMutex_rthreads));
 	mtx->mutex = slock_new();
 	return (YabMutex *)mtx;
+}
+
+#include "retro_timers.h"
+
+int YabNanosleep(u64 ns) {
+  struct timespec ts;
+  ts.tv_sec = 0;
+  ts.tv_nsec = ns*1000;   
+  nanosleep(&ts,NULL);
+  return 0;
 }
 
 //////////////////////////////////////////////////////////////////////////////
