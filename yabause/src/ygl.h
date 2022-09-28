@@ -48,12 +48,6 @@ extern "C" {
 #if defined(__LIBRETRO__) && !defined(_USEGLEW_)
     #include <glsym/glsym.h>
     #include <glsm/glsm.h>
-
-#define GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 0x90EB
-#define GL_MAX_COMPUTE_WORK_GROUP_COUNT   0x91BE
-#define GL_MAX_COMPUTE_WORK_GROUP_SIZE    0x91BF
-#define GL_ALL_BARRIER_BITS               0xFFFFFFFF
-
 #elif defined(__ANDROID__)
     #include <GLES3/gl31.h>
     #include <GLES3/gl3ext.h>
@@ -322,10 +316,7 @@ void YglCacheReset(YglTextureManager * tm);
 
 #define VDP2_CC_BLUR  0x04
 
-#define VDP1_SYSTEM_CLIP 0xFF
-#define VDP1_USER_CLIP 0xFE
-
-typedef enum
+enum
 {
    PG_NORMAL=1,
    PG_VDP1_NORMAL,
@@ -347,7 +338,6 @@ typedef enum
    PG_VDP2_BLUR,
    PG_VDP2_MOSAIC,
    PG_VDP2_PER_LINE_ALPHA,
-   PG_VDP2_PER_LINE_ALPHA_DST,
    PG_VDP2_NORMAL_CRAM,
    PG_VDP2_NORMAL_CRAM_SPECIAL_PRIORITY,
    PG_VDP2_NORMAL_CRAM_SPECIAL_PRIORITY_COLOROFFSET,
@@ -399,35 +389,8 @@ typedef enum
 
    PG_VDP2_DRAWFRAMEBUFF_ADDCOLOR_SHADOW,
 
-   PG_VULKAN_WINDOW,
-   PG_VULKAN_BLIT,
-
-   PG_VDP1_SYSTEM_CLIP,
-   PG_VDP1_USER_CLIP,
-   PG_VFP1_GOURAUDSAHDING_CLIP_INSIDE,
-   PG_VFP1_GOURAUDSAHDING_CLIP_OUTSIDE,
-   PG_VFP1_GOURAUDSAHDING_HALFTRANS_CLIP_INSIDE,
-   PG_VFP1_GOURAUDSAHDING_HALFTRANS_CLIP_OUTSIDE,
-   PG_VFP1_MESH_CLIP_INSIDE,
-   PG_VFP1_MESH_CLIP_OUTSIDE,
-   PG_VFP1_HALF_LUMINANCE_INSIDE,
-   PG_VFP1_HALF_LUMINANCE_OUTSIDE,
-   PG_VFP1_SHADOW_CLIP_INSIDE,
-   PG_VFP1_SHADOW_CLIP_OUTSIDE,
-   PG_VFP1_GOURAUDSAHDING_SPD_CLIP_INSIDE,
-   PG_VFP1_GOURAUDSAHDING_SPD_CLIP_OUTSIDE,
-
-   PG_VDP2_NORMAL_CRAM_DSTALPHA,
-   PG_NORMAL_DSTALPHA,
-
-   PG_VDP2_NOBLEND,
-   PG_VDP2_NOBLEND_CRAM,
-
-   PG_VDP2_BACK,
-   PG_VDP2_CRAM_SPECIAL_PRIORITY,
-
    PG_MAX,
-} YglPipelineId;
+};
 
 
 
@@ -460,8 +423,6 @@ typedef struct  {
  int u_color_ram_offset;
  float u_viewport_offset;
  int u_sprite_window;
- float u_from;
- float u_to;
 } UniformFrameBuffer;
 
 /*
@@ -716,12 +677,6 @@ typedef struct {
   float rotate_mval_v;
 } RBGDrawInfo;
 
-void RBGGenerator_init(int width, int height); 
-void RBGGenerator_resize(int width, int height); 
-void RBGGenerator_update(RBGDrawInfo * rbg );
-GLuint RBGGenerator_getTexture( int id ) ;
-void RBGGenerator_onFinish();
-
 int YglGLInit(int, int);
 int YglInit(int, int, unsigned int);
 void YglDeInit(void);
@@ -802,7 +757,7 @@ int YglGenerateAABuffer();
 int YglSetupWindow(YglProgram * prg);
 int YglCleanUpWindow(YglProgram * prg);
 
-void YglEraseWriteVDP1( int isDraw );
+void YglEraseWriteVDP1();
 void YglFrameChangeVDP1();
 
 #if !defined(__APPLE__) && !defined(__ANDROID__) && !defined(_USEGLEW_) && !defined(_OGLES3_) && !defined(__LIBRETRO__) &&  !defined(NX)
@@ -894,7 +849,6 @@ int YglDrawBackScreen(float w, float h);
 
 u32 Vdp2ColorRamGetColor(u32 colorindex, int alpha);
 
-void YglRebuildGramebuffer();
 
 #endif // YGL_H
 

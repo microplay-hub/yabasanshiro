@@ -131,8 +131,6 @@ u32 saved_scsp_cycles = 0;//fixed point
 volatile u64 saved_m68k_cycles = 0;//fixed point
 static u32 g_scsp_main_mode = 1;
 
-extern char * getLastShaderError();
-
 //////////////////////////////////////////////////////////////////////////////
 
 #ifndef NO_CLI
@@ -185,17 +183,6 @@ YabEventQueue * q_scsp_finish;
 
 int YabauseInit(yabauseinit_struct *init)
 {
-
-  YabThreadInit();
-
-  if( init->use_cpu_affinity ){
-   YabThreadSetCurrentThreadAffinityMask(YabThreadGetFastestCpuIndex());
-  }
-
-  yabsys.use_cpu_affinity = init->use_cpu_affinity;
-
-  yabsys.use_sh2_cache = init->use_sh2_cache;
-
   q_scsp_frame_start = YabThreadCreateQueue(1);
   q_scsp_finish = YabThreadCreateQueue(1);
   setM68kCounter(0);
@@ -284,11 +271,7 @@ int YabauseInit(yabauseinit_struct *init)
 
    if (VideoInit(init->vidcoretype) != 0)
    {
-      if(getLastShaderError() != NULL){
-         YabSetError(YAB_ERR_CANNOTINIT, getLastShaderError() );
-      }else{
-         YabSetError(YAB_ERR_CANNOTINIT, _("Video"));
-      }
+      YabSetError(YAB_ERR_CANNOTINIT, _("Video"));
       return -1;
    }
 
@@ -363,9 +346,6 @@ int YabauseInit(yabauseinit_struct *init)
 
    if (init->frameskip)
       EnableAutoFrameSkip();
-
-   VDP2SetFrameLimit(init->framelimit);
-
 
 #ifdef YAB_PORT_OSD
    OSDChangeCore(init->osdcoretype);
@@ -491,7 +471,6 @@ void YabFlushBackups(void)
 
 void YabauseDeInit(void) {
    
-  OSDDeInit();
    Vdp2DeInit();
    Vdp1DeInit();
    
@@ -718,7 +697,7 @@ int YabauseEmulate(void) {
       }
    }
 
-   //DoMovie();
+   DoMovie();
 
    #if defined(SH2_DYNAREC)
    if(SH2Core->id==2) {
@@ -739,7 +718,6 @@ int YabauseEmulate(void) {
    SH2OnFrame(MSH2);
    SH2OnFrame(SSH2);
    u64 cpu_emutime = 0;
-   Vdp2UpdateHv(0,0);
    while (!oneframeexec)
    {
       PROFILE_START("Total Emulation");
@@ -781,8 +759,6 @@ int YabauseEmulate(void) {
       cpu_emutime += (YabauseGetTicks() - current_cpu_clock) * 1000000 / yabsys.tickfreq;
 #endif
        yabsys.DecilineCount++;
-       //Vdp2UpdateHv(yabsys.DecilineCount,yabsys.LineCount);
-       
        if(yabsys.DecilineCount == 9) {
          // HBlankIN
          PROFILE_START("hblankin");
@@ -917,19 +893,6 @@ int YabauseEmulate(void) {
 #if DYNAREC_DEVMIYAX
    if (SH2Core->id == 3) SH2DynShowSttaics(MSH2, SSH2);
 #endif
-
-#ifdef CACHE_STATICS
-   DebugLog( "%d: MSH2 hit:%d, miss:%d, wirte:%d", yabsys.frame_count, MSH2->onchip.cache.read_hit_count, MSH2->onchip.cache.read_miss_count, MSH2->onchip.cache.write_count );
-   MSH2->onchip.cache.read_hit_count = 0;
-   MSH2->onchip.cache.read_miss_count = 0;
-   MSH2->onchip.cache.write_count = 0;
-
-   DebugLog( "%d: SSH2 hit:%d, miss:%d, wirte:%d", yabsys.frame_count, SSH2->onchip.cache.read_hit_count, SSH2->onchip.cache.read_miss_count, SSH2->onchip.cache.write_count );
-   SSH2->onchip.cache.read_hit_count = 0;
-   SSH2->onchip.cache.read_miss_count = 0;
-   SSH2->onchip.cache.write_count = 0;
-#endif
-
    return 0;
 }
 
@@ -971,15 +934,6 @@ void YabauseStartSlave(void) {
       MappedMemoryWriteLong(0xFFFFFFA0, 0x0000006D, NULL); // VCRDMA0
       MappedMemoryWriteLong(0xFFFFFF0C, 0x0000006E, NULL); // VCRDIV
       MappedMemoryWriteLong(0xFFFFFE10, 0x00000081, NULL); // TIER
-
-      MappedMemoryWriteByte(0xfffffe92, 0x00, NULL); // CCR
-      MappedMemoryWriteByte(0xfffffe92, 0x40, NULL); // CCR
-      MappedMemoryWriteByte(0xfffffe92, 0x80, NULL); // CCR
-      MappedMemoryWriteByte(0xfffffe92, 0x01, NULL); // CCR
-
-      SSH2->cycles = 0;
-      SH2Core->AddCycle(SSH2,2000);
-
       CurrentSH2 = MSH2;
 
       SH2GetRegisters(SSH2, &SSH2->regs);
@@ -1058,7 +1012,7 @@ void YabauseSetVideoFormat(int type) {
    yabsys.tickfreq = 1000;
 #endif
    yabsys.OneFrameTime =
-      type ? (yabsys.tickfreq / 50) : (yabsys.tickfreq * 10000 / 600000);
+      type ? (yabsys.tickfreq / 50) : (yabsys.tickfreq * 1001 / 60000);
    Vdp2Regs->TVSTAT = Vdp2Regs->TVSTAT | (type & 0x1);
    ScspChangeVideoFormat(type);
    YabauseChangeTiming(yabsys.CurSH2FreqType);
@@ -1387,11 +1341,6 @@ int YabauseQuickLoadGame(void)
       Vdp2ColorRamWriteWord(0x1C, 0xF39C);
       Vdp2ColorRamWriteWord(0x1E, 0xFBDE);
       Vdp2ColorRamWriteWord(0xFF, 0x0000);
-
-      // Enable Cache
-      CurrentSH2 = MSH2;
-      MappedMemoryWriteByte(0xfffffe92, 0x11, NULL); // CCR
-
    }
    else
    {
@@ -1409,11 +1358,8 @@ int YabauseQuickLoadGame(void)
    return 0;
 }
 
-#if !defined(IOS)
-#include <malloc.h>
-#endif
-
 // non standard function
+#include <malloc.h>
 char* strdup_ (const char* s)
 {
   size_t slen = strlen(s);

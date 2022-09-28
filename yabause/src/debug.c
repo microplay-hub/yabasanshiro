@@ -139,7 +139,7 @@ void DebugChangeOutput(Debug * d, DebugOutType t, char * s) {
 }
 
 #ifdef _WINDOWS
-#include <Windows.h>
+#include <windows.h>
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -187,16 +187,17 @@ void DebugPrintf(Debug * d, const char * file, u32 line, const char * format, ..
     {
       int i=0;
       int strnewhash = 0;
-#if !defined(ANDROID)
+#ifdef _WINDOWS
       static FILE * dfp = NULL;
       if (dfp == NULL){
         dfp = fopen("debug.txt", "w");
       }
-#else
-//      static FILE * dfp = NULL;
-//      if (dfp == NULL){
-//       dfp = fopen("/mnt/sdcard/debug.txt", "w");
-//      }
+#endif
+#ifdef ANDROID
+      static FILE * dfp = NULL;
+      if (dfp == NULL){
+        dfp = fopen("/mnt/sdcard/debug.txt", "w");
+      }
 #endif
       //i = sprintf(strtmp, "%s (%s:%ld): ", d->name, file, (long)line);
       i += vsprintf(strtmp + i, format, l);
@@ -205,13 +206,13 @@ void DebugPrintf(Debug * d, const char * file, u32 line, const char * format, ..
         //OutputDebugString(strtmp);
         //d->output.callback(strtmp);
         OSDAddLogString(strtmp);
-#if !defined(ANDROID)
+#if defined(ANDROID) 
         fprintf(dfp, "%s\n",strtmp);
         fflush(dfp);
-#else        
-        yprintf("%s",strtmp);
-//        fprintf(dfp, "%s\n",strtmp);
- //       fflush(dfp);
+#endif
+#if defined(_WINDOWS)
+        fprintf(dfp, "%s\n",strtmp);
+        fflush(dfp);
 #endif
       //}
       //strhash = strnewhash;
