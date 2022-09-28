@@ -36,7 +36,6 @@ using namespace Json;
 using std::unique_ptr;
 using std::ostringstream;
 
-#define RECORD_CHECK 0
 
 class PlayRecorder {
 private:
@@ -48,9 +47,6 @@ private:
   u32 index_;
   u32 scindex_;
   Json::Value record_;
-#if RECORD_CHECK
-  Json::Value record_check;
-#endif
   u32 current_frame;
   std::string dirname_;
   bool take_screenshot;
@@ -58,8 +54,6 @@ private:
   string fnameback_test;
 
   string basedir;
-
-  int screenshot_per_frame = 60*10;
   
 public:
   enum eStatus {

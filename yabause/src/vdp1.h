@@ -104,7 +104,7 @@ typedef struct
    void(*Vdp1LocalCoordinate)(u8 * ram, Vdp1 * regs);
    void(*Vdp1ReadFrameBuffer)(u32 type, u32 addr, void * out);
    void(*Vdp1WriteFrameBuffer)(u32 type, u32 addr, u32 val);
-   void(*Vdp1EraseWrite)(int isDraw);
+   void(*Vdp1EraseWrite)(void);
    void(*Vdp1FrameChange)(void);
    // VDP2 specific
    int (*Vdp2Reset)(void);
@@ -116,8 +116,6 @@ typedef struct
    void(*Sync)();
    void (*GetNativeResolution)(int *width, int *height, int * interlace);
    void(*Vdp2DispOff)(void);
-   void(*OnUpdateColorRamWord)(u32 addr);
-   void (*GetScreenshot)(void ** outbuf, int * width, int * height);
 } VideoInterface_struct;
 
 extern VideoInterface_struct *VIDCore;

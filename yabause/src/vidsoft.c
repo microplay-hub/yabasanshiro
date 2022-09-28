@@ -106,8 +106,7 @@ void VIDSoftSync(){};
 void VIDSoftVdp2DispOff(void);void VidsoftDrawSprite(Vdp2 * vdp2_regs, u8 * sprite_window_mask, u8* vdp1_front_framebuffer, u8 * vdp2_ram, Vdp1* vdp1_regs, Vdp2* vdp2_lines, u8*color_ram);
 void VIDSoftGetNativeResolution(int *width, int *height, int*interlace);
 void VIDSoftVdp2DispOff(void);void VIDSoftVdp2DispOff(void);
-void VIDSoftOnUpdateColorRamWord(u32 addr) {}
-void VIDSoftVulkanGetScreenshot(void ** outbuf, int * width, int * height) { return; }
+
 VideoInterface_struct VIDSoft = {
 VIDCORE_SOFT,
 "Software Video Interface",
@@ -143,9 +142,7 @@ VIDSoftGetGlSize,
 VIDSoftSetSettingValueMode,
 VIDSoftSync,
 VIDSoftGetNativeResolution,
-VIDSoftVdp2DispOff,
-VIDSoftOnUpdateColorRamWord,
-VIDSoftVulkanGetScreenshot
+VIDSoftVdp2DispOff
 };
 
 pixel_t *dispbuffer=NULL;
@@ -2201,14 +2198,14 @@ int VIDSoftInit(void)
 
    vidsoft_vdp1_thread_context.need_draw = 0;
    vidsoft_vdp1_thread_context.draw_finished = 1;
-   YabThreadStart(YAB_THREAD_VIDSOFT_VDP1, "vdp soft", VidsoftVdp1Thread, 0);
+   YabThreadStart(YAB_THREAD_VIDSOFT_VDP1, VidsoftVdp1Thread, 0);
 
-   YabThreadStart(YAB_THREAD_VIDSOFT_LAYER_RBG0, "vdp rbg0", VidsoftRbg0Thread, 0);
-   YabThreadStart(YAB_THREAD_VIDSOFT_LAYER_NBG0, "vdp nbg0",VidsoftNbg0Thread, 0);
-   YabThreadStart(YAB_THREAD_VIDSOFT_LAYER_NBG1, "vdp nbg1",VidsoftNbg1Thread, 0);
-   YabThreadStart(YAB_THREAD_VIDSOFT_LAYER_NBG2, "vdp nbg2",VidsoftNbg2Thread, 0);
-   YabThreadStart(YAB_THREAD_VIDSOFT_LAYER_NBG3, "vdp nbg3",VidsoftNbg3Thread, 0);
-   YabThreadStart(YAB_THREAD_VIDSOFT_LAYER_SPRITE, "vdp sprite",VidsoftSpriteThread, 0);
+   YabThreadStart(YAB_THREAD_VIDSOFT_LAYER_RBG0, VidsoftRbg0Thread, 0);
+   YabThreadStart(YAB_THREAD_VIDSOFT_LAYER_NBG0, VidsoftNbg0Thread, 0);
+   YabThreadStart(YAB_THREAD_VIDSOFT_LAYER_NBG1, VidsoftNbg1Thread, 0);
+   YabThreadStart(YAB_THREAD_VIDSOFT_LAYER_NBG2, VidsoftNbg2Thread, 0);
+   YabThreadStart(YAB_THREAD_VIDSOFT_LAYER_NBG3, VidsoftNbg3Thread, 0);
+   YabThreadStart(YAB_THREAD_VIDSOFT_LAYER_SPRITE, VidsoftSpriteThread, 0);
 
    return 0;
 }

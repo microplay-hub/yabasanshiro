@@ -20,11 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 
 #include <stdio.h>
 #include <string.h>
-#if defined(IOS)
-#include <stdlib.h>
-#else
-#include <malloc.h>
-#endif 
+#include <malloc.h> 
 #include <stdint.h>
 #include "core.h"
 #include "sh2core.h"

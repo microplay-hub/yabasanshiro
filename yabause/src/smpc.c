@@ -470,6 +470,7 @@ static void SmpcINTBACKPeripheral(void) {
 
 static void SmpcINTBACK(void) {
    SmpcRegs->SF = 1;
+
    if (SmpcInternalVars->intback) {
       SmpcINTBACKPeripheral();
       ScuSendSystemManager();
@@ -702,10 +703,6 @@ static void SmpcSetTiming(void) {
                //peripheral only
                SmpcInternalVars->timing = 16000;
                intback_wait_for_line = 1;
-            }
-            else {
-              SMPCLOG("smpc\t: unimplemented command: %02X\n", SmpcRegs->COMREG);
-              SmpcRegs->SF = 0;
             }
          }
          return;

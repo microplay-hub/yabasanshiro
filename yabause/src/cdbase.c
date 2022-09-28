@@ -59,7 +59,6 @@ static int LoadCHD(const char *chd_filename, FILE *iso_file);
 static int ISOCDReadSectorFADFromCHD(u32 FAD, void *buffer);
 static int LoadBinCueMultiFile(const char *cuefilename, FILE *iso_file);
 static int LoadBinCue(const char *cuefilename, FILE *iso_file);
-int checkCHD(const char *filename );
 
 // Remove this for now, execution on windows fails because of it
 // #include "streams/file_stream_transforms.h"
@@ -68,39 +67,6 @@ int checkCHD(const char *filename );
 #define stricmp strcasecmp
 #endif
 #endif
-
-#if defined(ANDROID)
-extern const char * GetFileDescriptorPath( const char * fileName );
-#endif
-
-#if defined(ANDROID)
-// Android 11 does not allow access file directory
-#include <unistd.h> // for dup()
-FILE* idiocy_fopen_fd(const char* fname, const char * mode) {
-  if (strstr(fname, "/proc/self/fd/") == fname) {
-    int fd = atoi(fname + 14);
-    if (fd != 0) {
-      // Why dup(fd) below: if we called fdopen() on the
-      // original fd value, and the native code closes
-      // and tries re-open that file, the second fdopen(fd)
-      // would fail, return NULL - after closing the
-      // original fd received from Android, it's no longer valid.
-      FILE *fp = fdopen(dup(fd), mode);
-      // Why rewind(fp): if the native code closes and
-      // opens again the file, the file read/write position
-      // would not change, because with dup(fd) it's still
-      // the same file...
-      rewind(fp);
-      return fp;
-    }
-  }
-  return fopen(fname, mode);
-}
-
-#define fopen idiocy_fopen_fd
-
-#endif
-
 
 #ifndef HAVE_WFOPEN
 static char * wcsdupstr(const wchar_t * path)
@@ -518,17 +484,6 @@ static FILE* OpenFile(char* buffer, const char* cue) {
    char *path;
    int tmp;
    FILE *ret_file = NULL;
-
-#if defined(ANDROID)
-  if (strstr(cue, "/proc/self/fd/") == cue) {
-     char * fdname = GetFileDescriptorPath(buffer);
-     if( fdname == NULL ){
-      YabSetError(YAB_ERR_FILENOTFOUND, buffer);
-      return -1;
-     }
-     ret_file = fopen(fdname, "rb");
-  }else{
-#endif
    // Now go and open up the image file, figure out its size, etc.
    if ((ret_file = fopen(buffer, "rb")) == NULL)
    {
@@ -566,12 +521,8 @@ static FILE* OpenFile(char* buffer, const char* cue) {
          YabSetError(YAB_ERR_FILENOTFOUND, buffer);
       }
    }
-#if defined(ANDROID)
-  }
-#endif
    return ret_file;
 }
-
 
 static int LoadBinCue(const char *cuefilename, FILE *iso_file)
 {
@@ -688,20 +639,6 @@ static int LoadBinCue(const char *cuefilename, FILE *iso_file)
   fseek(iso_file, 0, SEEK_SET);
   matched = fscanf(iso_file, "FILE \"%[^\"]\" %*s\r\n", temp_buffer);
 
-
-  // check if File deskmode or not
-#if defined(ANDROID)
-  if (strstr(cuefilename, "/proc/self/fd/") == cuefilename) {
-     char * fdname = GetFileDescriptorPath(temp_buffer);
-     if( fdname == NULL ){
-      YabSetError(YAB_ERR_FILENOTFOUND, temp_buffer);
-      free(temp_buffer);
-      return -1;
-     }
-
-     bin_file = fopen(fdname, "rb");
-  }else{
-#endif
   // Now go and open up the image file, figure out its size, etc.
   if ((bin_file = fopen(temp_buffer, "rb")) == NULL)
   {
@@ -759,9 +696,6 @@ static int LoadBinCue(const char *cuefilename, FILE *iso_file)
       return -1;
     }
   }
-#if defined(ANDROID)
-  }
-#endif
 
   fseek(bin_file, 0, SEEK_END);
   file_size = ftell(bin_file);
@@ -1052,7 +986,7 @@ int LoadMDSTracks(const char *mds_filename, FILE *iso_file, mds_session_struct *
                else
                   wcscpy(filename, img_filename);
 
-#if defined(NX) || defined(IOS)
+#if defined(NX)
                fp = fopen(filename, L"rb");
 #else
                fp = _wfopen(filename, L"rb");
@@ -1387,36 +1321,11 @@ static int LoadCCD(const char *ccd_filename, FILE *iso_file)
       return -1;
    }
 
-#if defined(ANDROID)
-  if (strstr(ccd_filename, "/proc/self/fd/") == ccd_filename) {
-    char * p  = strstr(ccd_filename, ";");
-    if( p != NULL){
-  	  strcpy(img_filename, p + 1);
-	    ext = strrchr(img_filename, '.');
-	    strcpy(ext, ".img");
-      const char * fdname = GetFileDescriptorPath(img_filename);
-      if( fdname == NULL ){
-
-        ext = strrchr(img_filename, '.');
-        strcpy(ext, ".iso");
-        const char * fdname = GetFileDescriptorPath(img_filename);
-        if( fdname == NULL ){
-          YabSetError(YAB_ERR_FILENOTFOUND, img_filename);
-          return -1;
-        }
-
-      }
-      fp = fopen(fdname, "rb");
-    }else{
-        YabSetError(YAB_ERR_FILENOTFOUND, ccd_filename);
-        return -1;
-    }
-  }else{
-#endif
 	strcpy(img_filename, ccd_filename);
 	ext = strrchr(img_filename, '.');
 	strcpy(ext, ".img");
 	fp = fopen(img_filename, "rb");
+
 	if (fp == NULL)
 	{
 		ext = strrchr(img_filename, '.');
@@ -1427,9 +1336,7 @@ static int LoadCCD(const char *ccd_filename, FILE *iso_file)
 			return -1;
 		}
 	}
-#if defined(ANDROID)
-  }
-#endif
+
 	fseek(iso_file, 0, SEEK_SET);
 
 	// Load CCD file as dictionary
