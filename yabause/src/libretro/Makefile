@@ -176,6 +176,20 @@ else ifeq ($(platform), rpi4)
 	DYNAREC_DEVMIYAX = 1
 	FLAGS += -mcpu=cortex-a72 -mtune=cortex-a72
 
+# Rpi4 (32-bit)
+else ifeq ($(platform), rpi4_32)
+	override platform += unix
+	TARGET := $(TARGET_NAME)_libretro.so
+	fpic := -fPIC
+	SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
+	LDFLAGS += -lpthread
+	ARCH_IS_LINUX = 1
+	HAVE_SSE = 0
+	FORCE_GLES = 1
+	USE_ARM_DRC = 1
+	DYNAREC_DEVMIYAX = 1
+	FLAGS += -mcpu=cortex-a72 -mtune=cortex-a72
+
 # ODROIDs
 else ifneq (,$(findstring odroid-c4,$(platform)))
 	override platform += unix
